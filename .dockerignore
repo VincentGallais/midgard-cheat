@@ -1,0 +1,11 @@
+.gitattributes
+.gitignore
+Dockerfile
+README.md
+
+restart.sh
+script.bat
+seed.sql
+todo.txt
+build.sh
+docker-compose.yml

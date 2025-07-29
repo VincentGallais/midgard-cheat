@@ -1,0 +1,26 @@
+services:
+  midgard-cheat-detection:
+    image: midgard/cheat-detection:latest
+    container_name: midgard-cheat-detection
+    networks:
+      - midgard-network
+    restart: always
+    ports:
+      - 10002:8080
+    environment:
+      - POSTGRES_PRIMARY=midgard-postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PWD=postgres
+      - POSTGRES_DB=midgard-cheat-detection
+      - ARGINE_URL=http://argine:3000
+    secrets:
+      - GOOGLE_APPLICATION_CREDENTIALS
+
+secrets:
+  GOOGLE_APPLICATION_CREDENTIALS:
+    file: ./gcp_credentials.json
+
+networks:
+  midgard-network:
+    external: true
+    name: argineNetwork
