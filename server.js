@@ -1,5 +1,5 @@
 import { CommonsServer } from 'midgard-commons/lib/common-server.js'
-import { CheatDetection } from './endpoints/cheat-detection'
+import { CheatDetection } from './endpoints/cheat.js'
 
 const server = new CommonsServer()
 
