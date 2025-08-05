@@ -1,52 +1,6 @@
-import { ArgineInterface, QueryTypes } from 'midgard-commons/lib/argine-interface.js'
 import * as bridge from 'midgard-commons/lib/bridge.js'
+import * as utils from './utils.js'
 import fs from 'fs/promises'
-import { match } from 'assert'
-
-// TODO : utiliser le bon scoring type dans les appels à Argine
-const argineInterface = new ArgineInterface()
-
-function formatToArgine(input) {
-  return input
-    .split('-')
-    .map((part) => part.slice(0, 2))
-    .join('')
-}
-
-function getPlayerCards(distribution, player) {
-  const playerCards = []
-  for (let i = 0; i < distribution.length; i++) {
-    if (distribution[i] === player) {
-      playerCards.push(bridge.CARDS[i])
-    }
-  }
-  return playerCards.reverse()
-}
-
-function getMaskForPlayer(player) {
-  switch (player) {
-    case bridge.PLAYER_SOUTH:
-      return 1
-    case bridge.PLAYER_WEST:
-      return 2
-    case bridge.PLAYER_NORTH:
-      return 4
-    case bridge.PLAYER_EAST:
-      return 8
-    default:
-      return 0
-  }
-}
-
-async function getCard(query) {
-  const { data } = await argineInterface.callArgine(query, QueryTypes.Card)
-  return data.value.slice(0, 2)
-}
-
-async function getEval(query, player = bridge.PLAYER_SOUTH) {
-  const { data } = await argineInterface.callArgine({ ...query, maskHand: getMaskForPlayer(player) }, QueryTypes.Eval)
-  return data.value.split(';')
-}
 
 async function scanLead() {
   const raw = await fs.readFile('src/data/mockData.json', 'utf-8')
@@ -62,20 +16,21 @@ async function scanLead() {
         },
         game: {
           cards: '',
-          bids: formatToArgine(game.ST_bids)
+          bids: utils.formatToArgine(game.ST_bids)
         },
         conventions: { NS: bridge.defaultConventions, EW: bridge.defaultConventions },
         options: bridge.defaultOptions
       }
 
       try {
-        const argineLead = await getCard(query)
+        const argineLead = await utils.getCard(query)
         const playerLead = game.ST_cards.slice(0, 2)
 
-        const leadEval = (await getEval(query)).slice(0, 13)
+        const leadEval = (await utils.getEval(query)).slice(0, 13)
 
-        const playerCards = getPlayerCards(game.ST_distribution, bridge.PLAYER_SOUTH)
+        const playerCards = utils.getPlayerCards(game.ST_distribution, bridge.PLAYER_SOUTH)
 
+        // Trouver l'index des cartes jouées
         const argineLeadCardIndex = playerCards.indexOf(argineLead)
         const playerLeadCardIndex = playerCards.indexOf(playerLead)
 
@@ -87,52 +42,17 @@ async function scanLead() {
 
         const delta = playerLeadEval - argineLeadEval
         if (delta > 0) {
-          console.log(`Joueur ${delta}, ${game.FT_final_score_deal}`)
+          console.log(`Player ${delta}, ${game.FT_final_score_deal}`)
         } else if (delta < 0) {
           console.log(`Argine ${-delta}, ${game.FT_final_score_deal}`)
         } else {
-          console.log(`Identique`)
+          console.log(`Identical`)
         }
       } catch (e) {
-        console.error(`Erreur pour la game ${game.ID_game}:`, e)
+        console.error(`Error for game ${game.ID_game}:`, e)
       }
     }
   }
-}
-
-function divideChunks(arr, chunkSize) {
-  const result = []
-  for (let i = 0; i < arr.length; i += chunkSize) {
-    result.push(arr.slice(i, i + chunkSize))
-  }
-  return result
-}
-
-function getPlayerHcp(cards) {
-  const hcp = {
-    A: 4,
-    K: 3,
-    Q: 2,
-    J: 1
-  }
-  return cards.reduce((total, card) => {
-    const rank = card[0]
-    return total + (hcp[rank] || 0)
-  }, 0)
-}
-
-function getPlayerCardsBySuits(cards) {
-  const suits = {
-    C: 0,
-    D: 0,
-    H: 0,
-    S: 0
-  }
-  for (const card of cards) {
-    const suit = card[1]
-    suits[suit] += 1
-  }
-  return suits
 }
 
 async function scanBids() {
@@ -141,7 +61,7 @@ async function scanBids() {
 
   // Je veux tester toutes les enchères de Sud par rapport à la reglette
   for (const game of games) {
-    const bidding = divideChunks(formatToArgine(game.ST_bids), 2)
+    const bidding = utils.divideChunks(utils.formatToArgine(game.ST_bids), 2)
 
     // Trouver l'index du joueur dans bridge.PLAYERS en considérant que game.CD_dealer est le premier
     const dealerIdx = bridge.PLAYERS.indexOf(game.CD_dealer)
@@ -164,14 +84,13 @@ async function scanBids() {
           options: bridge.defaultOptions
         }
 
-        const { data } = await argineInterface.callArgine(query, QueryTypes.BidInfo)
+        const bidInfo = await utils.getBidInfo(query)
+        const [minC, maxC, minD, maxD, minH, maxH, minS, maxS, minPts, maxPts] = bidInfo
 
-        const [minC, maxC, minD, maxD, minH, maxH, minS, maxS, minPts, maxPts] = data.value.split(';').map(Number)
+        const playerCards = utils.getPlayerCards(game.ST_distribution, bridge.PLAYER_SOUTH)
 
-        const playerCards = getPlayerCards(game.ST_distribution, bridge.PLAYER_SOUTH)
-
-        const playerHcp = getPlayerHcp(playerCards)
-        const playerCardsBySuits = getPlayerCardsBySuits(playerCards)
+        const playerHcp = utils.getPlayerHcp(playerCards)
+        const playerCardsBySuits = utils.utils.getPlayerCardsBySuits(playerCards)
 
         const TOLERANCE_HCP = 2
         const TOLERANCE_CARD = 1
@@ -195,7 +114,7 @@ async function scanBids() {
 
         if (playerDifferences.length !== 0) {
           console.log(
-            `Différences pour Sud: ${playerDifferences.join(', ')}, Enchère: ${bid}, Séquence : ${bidding.slice(0, idx + 1).join('')}, Score: ${game.FT_final_score_deal}`
+            `Differences for South: ${playerDifferences.join(', ')}, Bid: ${bid}, Sequence: ${bidding.slice(0, idx + 1).join('')}, Score: ${game.FT_final_score_deal}`
           )
         }
       }
@@ -228,14 +147,17 @@ async function analyzeCards(game, ciblePlayer) {
       distribution: game.ST_distribution
     },
     game: {
-      cards: formatToArgine(game.ST_cards),
-      bids: formatToArgine(game.ST_bids)
+      cards: utils.formatToArgine(game.ST_cards),
+      bids: utils.formatToArgine(game.ST_bids)
     },
     conventions: { NS: bridge.defaultConventions, EW: bridge.defaultConventions },
     options: bridge.defaultOptions
   }
 
-  const cardEvals = await getEval(query, ciblePlayer)
+  // Obtenir les cartes du joueur courant
+  const playerCards = utils.getPlayerCards(game.ST_distribution, ciblePlayer)
+
+  const cardEvals = await utils.getEval(query, ciblePlayer)
   const evalChunks = []
 
   for (let i = 0; i < cardEvals.length; i += 52) {
@@ -251,9 +173,8 @@ async function analyzeCards(game, ciblePlayer) {
 
   // On n'analyse ni l'entame (index 1) ni les 4 dernières cartes
   for (let cardIdx = 1; cardIdx < Math.min(cardList.length, 48); cardIdx++) {
-    const cardWithPlayer = cardList[cardIdx]
-    const cardValue = cardWithPlayer.slice(0, 2)
-    const cardPlayer = cardWithPlayer[2]
+    const cardValue = cardList[cardIdx].slice(0, 2)
+    const cardPlayer = cardList[cardIdx][2]
 
     // On arrête d'analyser après un claim
     if (cardValue.slice(0, 1) === '!') {
@@ -261,16 +182,13 @@ async function analyzeCards(game, ciblePlayer) {
     }
 
     if (cardPlayer === ciblePlayer) {
-      const cardsPlayedSoFar = formatToArgine(game.ST_cards.slice(0, cardIdx * 4))
+      const cardsPlayedSoFar = utils.formatToArgine(game.ST_cards.slice(0, cardIdx * 4))
 
       try {
         // Demander à Argine quelle carte elle aurait joué
-        const argineCard = await getCard({ ...query, game: { ...query.game, cards: cardsPlayedSoFar } })
+        const argineCard = await utils.getCard({ ...query, game: { ...query.game, cards: cardsPlayedSoFar } })
 
-        // Obtenir les cartes du joueur courant
-        const playerCards = getPlayerCards(game.ST_distribution, ciblePlayer)
-
-        // Trouver les index des cartes
+        // Trouver l'index des cartes jouées
         const argineCardIndex = playerCards.indexOf(argineCard)
         const playerCardIndex = playerCards.indexOf(cardValue)
 
@@ -283,12 +201,16 @@ async function analyzeCards(game, ciblePlayer) {
 
         const delta = playerEval - argineEval
         if (delta > 0) {
-          console.log(`${ciblePlayer} - Carte ${cardIdx + 1}: Joueur: ${cardValue} (${playerEval}), Argine: ${argineCard} (${argineEval}), écart de ${delta}`)
+          console.log(
+            `Game ${game.ID_game}, ${ciblePlayer} - Card ${cardIdx + 1}: Player: ${cardValue} (${playerEval}), Argine: ${argineCard} (${argineEval}), delta ${delta}`
+          )
         } else if (delta < 0) {
-          console.log(`${ciblePlayer} - Carte ${cardIdx + 1}: Joueur: ${cardValue} (${playerEval}), Argine: ${argineCard} (${argineEval}), écart de ${delta}`)
+          console.log(
+            `Game ${game.ID_game}, ${ciblePlayer} - Card ${cardIdx + 1}: Player: ${cardValue} (${playerEval}), Argine: ${argineCard} (${argineEval}), delta ${delta}`
+          )
         }
       } catch (e) {
-        console.error(`Erreur lors de l'analyse de la carte ${ciblePlayer} ${cardIdx + 1} pour la game ${game.ID_game}:`, e)
+        console.error(`Error while analyzing card ${ciblePlayer} ${cardIdx + 1} for game ${game.ID_game}:`, e)
       }
     }
   }
