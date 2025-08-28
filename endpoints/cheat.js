@@ -23,9 +23,9 @@ export class CheatDetection {
   }
 
   registerEndpoints(fastifyInstance) {
-    fastifyInstance.post('/api/cheat-detection/scan-lead', async (request, reply) => {
+    fastifyInstance.post('/api/cheat-detection', async (request, reply) => {
       try {
-        const result = await detection.scanLead()
+        const result = await detection.analyze()
 
         return reply.status(200).send({
           success: true,
@@ -33,32 +33,6 @@ export class CheatDetection {
         })
       } catch (error) {
         return this.handleError(reply, error, 'Lead')
-      }
-    })
-
-    fastifyInstance.post('/api/cheat-detection/scan-bidding', async (request, reply) => {
-      try {
-        const result = await detection.scanBids()
-
-        return reply.status(200).send({
-          success: true,
-          data: result
-        })
-      } catch (error) {
-        return this.handleError(reply, error, 'Bidding')
-      }
-    })
-
-    fastifyInstance.post('/api/cheat-detection/scan-carding', async (request, reply) => {
-      try {
-        const result = await detection.scanCards()
-
-        return reply.status(200).send({
-          success: true,
-          data: result
-        })
-      } catch (error) {
-        return this.handleError(reply, error, 'Bidding')
       }
     })
   }

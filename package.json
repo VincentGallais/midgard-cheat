@@ -11,6 +11,10 @@
     {
       "name": "Warren Moreau",
       "email": "warren.moreau@52-entertainment.com"
+    },
+    {
+      "name": "Vincent Gallais",
+      "email": "vincent.gallais@52-entertainment.com"
     }
   ],
   "license": "UNLICENSED",
@@ -19,7 +23,8 @@
     "@types/node": "^24.0.14",
     "eslint": "^9.31.0",
     "globals": "^16.3.0",
-    "prettier": "^3.6.2"
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.5"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.846.0",
@@ -28,6 +33,7 @@
     "@fastify/postgres": "^6.0.2",
     "@fastify/schedule": "^6.0.0",
     "axios": "^1.10.0",
+    "bridge-commons": "file:C:\\Users\\VincentGallais\\Desktop\\Dev\\funbridge-commons-js",
     "date-fns": "^4.1.0",
     "fastify": "^5.4.0",
     "midgard-commons": "github:52-entertainment/midgard-commons#master",
@@ -35,5 +41,8 @@
     "pino": "^9.7.0",
     "pino-pretty": "^13.0.0",
     "toad-scheduler": "^3.1.0"
+  },
+  "scripts": {
+    "dev": "tsx --watch src/detection.ts"
   }
 }
