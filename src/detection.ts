@@ -3,25 +3,20 @@ import { constants } from 'bridge-commons/core'
 import { Game } from 'bridge-commons/core/classes'
 import * as utils from './utils'
 
-const MASK_S = 1
-const TOLERANCE = {
-  card: 1,
-  hcp: 2
-}
 analyze()
 
 export async function analyze() {
   const raw = await fs.readFile('./src/mockData.json', 'utf-8')
   const games = JSON.parse(raw)
 
-  for (const inputGame of games.slice(1, 2)) {
+  for (const inputGame of games.slice(0, 5)) {
     const game = utils.parseToArgine(inputGame)
 
-    // if (game.contract!.leader == constants.PLAYER_S) {
-    //   await scanLead(game)
-    // }
+    if (game.contract!.leader == constants.PLAYER_S) {
+      await scanLead(game)
+    }
 
-    // await scanBids(game)
+    await scanBids(game)
 
     await scanCards(game)
   }
@@ -35,7 +30,7 @@ async function scanLead(game: Game) {
     const argineLead = await utils.getCard(query)
     const playerLead = game.playedCards.at(0)!
 
-    const leadEval = (await utils.getEval(query)).slice(0, 13)
+    const leadEval = (await utils.getEval(query))[0]
 
     const playerCards = game.distribution.getByPlayer(constants.PLAYER_S)
 
@@ -53,6 +48,11 @@ async function scanLead(game: Game) {
 }
 
 async function scanBids(game: Game) {
+  const TOLERANCE = {
+    card: 1,
+    hcp: 2
+  }
+
   const query = game.toArgine()
 
   for (const [idx, bid] of game.bidList.entries()) {
@@ -80,16 +80,31 @@ async function scanBids(game: Game) {
 
 // TODO : Je regarde si le nombre de levées est populaire (pour les joueurs au même atout et les joueurs au même contrat)
 async function scanCards(game: Game) {
-  for (const [idx, card] of game.playedCards.entries()) {
-    if (card.player === constants.PLAYER_S || (card.player === constants.PLAYER_N && game.contract?.declarer === constants.PLAYER_S)) {
-      const query = { ...game.toArgine() }
-      query.game.cards = game.playedCards.toArgineString().slice(0, idx * 2)
+  const query = { ...game.toArgine() }
 
+  const cardsEval = {
+    south: await utils.getEval(query, constants.PLAYER_S),
+    north: await utils.getEval(query, constants.PLAYER_N)
+  }
+
+  for (const [cardIdx, card] of game.playedCards.entries()) {
+    // We don't analyze cards with idx > 48 (last trick, player don't have any choice)
+    if (cardIdx < 48 && (card.player === constants.PLAYER_S || (card.player === constants.PLAYER_N && game.contract?.declarer === constants.PLAYER_S))) {
+      query.game.cards = game.playedCards.toArgineString().slice(0, cardIdx * 2)
+
+      const playerCards = game.distribution.getByPlayer(constants.PLAYER_S)
       const argineCard = await utils.getCard(query)
 
-      console.log(`Carte jouée: ${card.toString()}, Carte Argine: ${argineCard.toString()}`)
+      const argineCardIdx = 12 - playerCards.indexOf(argineCard)
+      const playerLeadIdx = 12 - playerCards.indexOf(card)
 
-      // Je compare à eval, pour voir si c'était mieux ou moins bien
+      const playerEval = card.player === constants.PLAYER_S ? cardsEval.south : cardsEval.north
+      const argineCardEval = playerEval[cardIdx][argineCardIdx]
+      const playerCardEval = playerEval[cardIdx][playerLeadIdx]
+
+      if (playerCardEval > argineCardEval) {
+        console.log(`Carte jouée: ${card.toString()} ${playerCardEval}, Carte Argine: ${argineCard.toString()} ${argineCardEval}`)
+      }
     }
   }
 }

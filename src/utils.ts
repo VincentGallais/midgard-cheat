@@ -87,7 +87,14 @@ export async function getCard(query: any) {
 
 export async function getEval(query: any, player = constants.PLAYER_S) {
   const { data } = await argineInterface.callArgine({ ...query, maskHand: getPlayerMask(player) }, QueryTypes.Eval)
-  return data.value.split(';')
+  const splitData = data.value.split(';')
+  const result: string[][] = []
+
+  for (let i = 0; i < splitData.length; i += 13) {
+    result.push(splitData.slice(i, i + 13))
+  }
+
+  return result
 }
 
 export async function getBidInfo(query: any): Promise<BidInfo> {
