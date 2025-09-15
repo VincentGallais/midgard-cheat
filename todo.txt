@@ -1,6 +1,1 @@
 Mappeur score IMP -> PV
-
--- Librairie commons
-Donner un ID à une game
-Donner un argineConfidence
-Fonction formatBidInfo
